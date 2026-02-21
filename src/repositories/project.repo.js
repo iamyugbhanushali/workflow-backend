@@ -98,6 +98,15 @@ const getProjectMemberRole = async (projectId, userId) => {
   return rows[0];
 };
 
+const removeProjectMember = async (projectId, userId) => {
+  await pool.query(
+    `DELETE FROM project_members
+     WHERE project_id = $1
+       AND user_id = $2`,
+    [projectId, userId]
+  );
+};
+
 module.exports = {
   createProject,
   getProjectsByUser,
@@ -107,5 +116,6 @@ module.exports = {
   getProjectMember,
   getProjectMembers,
   updateMemberRole,
-  getProjectMemberRole
+  getProjectMemberRole,
+  removeProjectMember
 };

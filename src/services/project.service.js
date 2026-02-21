@@ -102,6 +102,24 @@ const checkProjectPermission = async (
   }
 };
 
+const removeProjectMember = async (projectId, memberId, ownerId) => {
+
+  const project = await projectRepo.findByIdAndUser(projectId, ownerId);
+
+  if (!project) {
+    throw new Error("Unauthorized or project not found");
+  }
+
+  const member = await projectRepo.getProjectMember(projectId, memberId);
+
+  if (!member) {
+    throw new Error("Member not found in this project");
+  }
+
+  await projectRepo.removeProjectMember(projectId, memberId);
+};
+
+
 
 module.exports = {
   createProject,
@@ -110,5 +128,6 @@ module.exports = {
   addProjectMember,
   getProjectMembers,
   updateMemberRole,
-  checkProjectPermission
+  checkProjectPermission,
+  removeProjectMember
 };

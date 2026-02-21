@@ -28,5 +28,11 @@ router.patch(
   projectController.updateMemberRole
 );
 
+router.delete(
+  "/:projectId/members/:memberId",
+  authMiddleware,
+  projectController.removeProjectMember
+);
+
 
 module.exports = router;

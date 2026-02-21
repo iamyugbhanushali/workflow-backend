@@ -1,5 +1,6 @@
 const taskRepo = require("../repositories/task.repo");
 const projectRepo = require("../repositories/project.repo");
+const projectService = require("./project.service");
 
 const createTask = async ({
   title,
@@ -43,6 +44,7 @@ const getTasksByProject = async (projectId, userId) => {
 const ALLOWED_STATUS = ["todo", "in_progress", "completed", "blocked"];
 
 const updateTaskStatus = async (taskId, status, userId) => {
+
   if (!ALLOWED_STATUS.includes(status)) {
     throw new Error("Invalid status value");
   }
@@ -53,23 +55,33 @@ const updateTaskStatus = async (taskId, status, userId) => {
     throw new Error("Task not found");
   }
 
-  const project = await projectRepo.findByIdAndUser(
-    task.project_id,
-    userId
-  );
+  // 🔐 RBAC CHECK
+  try {
+    // OWNER or ADMIN → allowed
+    await projectService.checkProjectPermission(
+      task.project_id,
+      userId,
+      ["ADMIN"]
+    );
+  } catch (err) {
 
-  if (!project) {
-    throw new Error("Unauthorized");
+    // MEMBER → allowed only if task is assigned to them
+    if (task.assigned_to !== userId) {
+      throw new Error("Forbidden: insufficient permissions");
+    }
+
   }
 
   const oldStatus = task.status;
 
+  // 🧠 idempotent behaviour (unchanged)
   if (oldStatus === status) {
     return task;
   }
 
   const updatedTask = await taskRepo.updateTaskStatus(taskId, status);
 
+  // 🧾 audit log (unchanged)
   await taskRepo.createTaskAuditLog({
     taskId,
     userId,
@@ -168,21 +180,30 @@ const getMyTasks = async (userId, filters) => {
   return await taskRepo.getTasksAssignedToUser(userId, filters);
 };
 
+
 const updateTask = async (taskId, updates, userId) => {
+
   const task = await taskRepo.getTaskById(taskId);
 
   if (!task) {
     throw new Error("Task not found");
   }
 
-  // ownership check via project
-  const project = await projectRepo.findByIdAndUser(
-    task.project_id,
-    userId
-  );
+  // 🔐 RBAC CHECK
+  try {
+    // OWNER or ADMIN can update any task
+    await projectService.checkProjectPermission(
+      task.project_id,
+      userId,
+      ["ADMIN"]
+    );
+  } catch (err) {
 
-  if (!project) {
-    throw new Error("Unauthorized");
+    // If not OWNER/ADMIN → allow only if task is assigned to the user
+    if (task.assigned_to !== userId) {
+      throw new Error("Forbidden: insufficient permissions");
+    }
+
   }
 
   // prevent status update from this endpoint

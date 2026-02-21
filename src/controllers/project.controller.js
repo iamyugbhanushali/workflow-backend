@@ -140,6 +140,35 @@ const updateMemberRole = async (req, res) => {
   }
 };
 
+const removeProjectMember = async (req, res) => {
+  try {
+    const { projectId, memberId } = req.params;
+    const ownerId = req.user.id;
+
+    await projectService.removeProjectMember(
+      projectId,
+      memberId,
+      ownerId
+    );
+
+    res.json({
+      message: "Member removed successfully",
+    });
+
+  } catch (err) {
+
+    if (
+      err.message.includes("Unauthorized") ||
+      err.message.includes("not found")
+    ) {
+      return res.status(400).json({ message: err.message });
+    }
+
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 
 
 module.exports = {
@@ -148,5 +177,6 @@ module.exports = {
   getProjectById,
   addProjectMember,
   getProjectMembers,
-  updateMemberRole
+  updateMemberRole,
+  removeProjectMember
 };
