@@ -107,6 +107,36 @@ const removeProjectMember = async (projectId, userId) => {
   );
 };
 
+const getProjectStats = async (projectId) => {
+
+  const { rows } = await pool.query(
+    `
+    SELECT
+      COUNT(*)::int AS total,
+
+      COUNT(*) FILTER (WHERE status = 'todo')::int AS todo,
+
+      COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+
+      COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+
+      COUNT(*) FILTER (WHERE status = 'blocked')::int AS blocked,
+
+      COUNT(*) FILTER (
+        WHERE due_date < CURRENT_DATE
+        AND status != 'completed'
+      )::int AS overdue
+
+    FROM tasks
+    WHERE project_id = $1
+      AND is_deleted = FALSE
+    `,
+    [projectId]
+  );
+
+  return rows[0];
+};
+
 module.exports = {
   createProject,
   getProjectsByUser,
@@ -117,5 +147,6 @@ module.exports = {
   getProjectMembers,
   updateMemberRole,
   getProjectMemberRole,
-  removeProjectMember
+  removeProjectMember,
+  getProjectStats
 };

@@ -34,5 +34,10 @@ router.delete(
   projectController.removeProjectMember
 );
 
+router.get(
+  "/:projectId/stats",
+  authMiddleware,
+  projectController.getProjectStats
+);
 
 module.exports = router;

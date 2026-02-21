@@ -168,7 +168,25 @@ const removeProjectMember = async (req, res) => {
   }
 };
 
+const getProjectStats = async (req, res) => {
+  try {
 
+    const { projectId } = req.params;
+    const userId = req.user.id;
+
+    const stats = await projectService.getProjectStats(projectId, userId);
+
+    res.json(stats);
+
+  } catch (err) {
+
+    if (err.message.includes("Forbidden")) {
+      return res.status(403).json({ message: err.message });
+    }
+
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 
 module.exports = {
@@ -178,5 +196,6 @@ module.exports = {
   addProjectMember,
   getProjectMembers,
   updateMemberRole,
-  removeProjectMember
+  removeProjectMember,
+  getProjectStats
 };

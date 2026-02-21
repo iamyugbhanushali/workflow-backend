@@ -119,7 +119,12 @@ const removeProjectMember = async (projectId, memberId, ownerId) => {
   await projectRepo.removeProjectMember(projectId, memberId);
 };
 
+const getProjectStats = async (projectId, userId) => {
 
+  await checkProjectPermission(projectId, userId, ["ADMIN", "MEMBER"]);
+
+  return await projectRepo.getProjectStats(projectId);
+};
 
 module.exports = {
   createProject,
@@ -129,5 +134,6 @@ module.exports = {
   getProjectMembers,
   updateMemberRole,
   checkProjectPermission,
-  removeProjectMember
+  removeProjectMember,
+  getProjectStats
 };
