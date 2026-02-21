@@ -10,10 +10,12 @@ const createTask = async ({
   projectId,
   userId,
 }) => {
-  const project = await projectRepo.getProjectById(projectId, userId);
-  if (!project) {
-    throw new Error("Unauthorized or project not found");
-  }
+
+  await projectService.checkProjectPermission(
+    projectId,
+    userId,
+    ["ADMIN"]
+  );
 
   return await taskRepo.createTask({
     title,
