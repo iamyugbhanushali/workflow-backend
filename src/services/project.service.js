@@ -126,6 +126,14 @@ const getProjectStats = async (projectId, userId) => {
   return await projectRepo.getProjectStats(projectId);
 };
 
+const getProjectActivity = async (projectId, userId) => {
+
+  await checkProjectPermission(projectId, userId, ["ADMIN", "MEMBER"]);
+
+  return await projectRepo.getProjectActivity(projectId);
+};
+
+
 module.exports = {
   createProject,
   getProjects,
@@ -135,5 +143,6 @@ module.exports = {
   updateMemberRole,
   checkProjectPermission,
   removeProjectMember,
-  getProjectStats
+  getProjectStats,
+  getProjectActivity
 };

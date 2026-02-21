@@ -137,6 +137,60 @@ const getProjectStats = async (projectId) => {
   return rows[0];
 };
 
+const getProjectActivity = async (projectId) => {
+
+  const { rows } = await pool.query(
+    `
+    SELECT * FROM (
+
+      -- STATUS CHANGES
+      SELECT
+        'STATUS_CHANGE' AS type,
+        t.id AS task_id,
+        t.title AS task_title,
+        tal.old_status,
+        tal.new_status,
+        u.name AS changed_by,
+        tal.changed_at
+
+      FROM task_audit_logs tal
+      JOIN tasks t ON t.id = tal.task_id
+      JOIN users u ON u.id = tal.changed_by
+
+      WHERE t.project_id = $1
+
+
+      UNION ALL
+
+
+      -- ASSIGNMENT CHANGES
+      SELECT
+        'ASSIGNMENT_CHANGE' AS type,
+        t.id AS task_id,
+        t.title AS task_title,
+        old_user.name AS old_status,
+        new_user.name AS new_status,
+        actor.name AS changed_by,
+        tal.changed_at
+
+      FROM task_assignment_logs tal
+      JOIN tasks t ON t.id = tal.task_id
+      LEFT JOIN users old_user ON old_user.id = tal.old_assigned_to
+      JOIN users new_user ON new_user.id = tal.new_assigned_to
+      JOIN users actor ON actor.id = tal.changed_by
+
+      WHERE t.project_id = $1
+
+    ) AS activity
+
+    ORDER BY changed_at DESC
+    `,
+    [projectId]
+  );
+
+  return rows;
+};
+
 module.exports = {
   createProject,
   getProjectsByUser,
@@ -148,5 +202,6 @@ module.exports = {
   updateMemberRole,
   getProjectMemberRole,
   removeProjectMember,
-  getProjectStats
+  getProjectStats,
+  getProjectActivity
 };

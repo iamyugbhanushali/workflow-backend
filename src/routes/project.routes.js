@@ -40,4 +40,10 @@ router.get(
   projectController.getProjectStats
 );
 
+router.get(
+  "/:projectId/activity",
+  authMiddleware,
+  projectController.getProjectActivity
+);
+
 module.exports = router;
