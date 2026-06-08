@@ -1,9 +1,9 @@
 const projectService = require("../services/project.service");
 
-const createProject = async (req , res) => {
+const createProject = async (req, res) => {
   try {
-    const {name , description} = req.body;
-    if(!name) {
+    const { name, description } = req.body;
+    if (!name) {
       return res.status(400).json({ message: "Project name is required" });
     }
     const project = await projectService.createProject({
@@ -15,16 +15,20 @@ const createProject = async (req , res) => {
       message: "Project created successfully",
       project,
     });
-  } catch (err) {    res.status(500).json({
+  } catch (err) {
+    res.status(500).json({
       message: "Error creating project",
-      error: err.message, 
+      error: err.message,
     });
   }
 };
 
-const getProjects = async (req , res) => {
+const getProjects = async (req, res) => {
   try {
-    const projects = await projectService.getProjects(req.user.id);
+    const projects = await projectService.getProjects(
+      req.user.id,
+      req.user.role_id
+    );
     res.json({
       message: "Projects retrieved successfully",
       projects,
@@ -35,16 +39,20 @@ const getProjects = async (req , res) => {
       error: err.message,
     });
   }
-}
+};
 
-const getProjectById = async(req,res) => {
-  try{
+const getProjectById = async (req, res) => {
+  try {
     const projectId = req.params.id;
     const userId = req.user.id;
 
-    const project = await projectService.getProjectById(projectId , userId);
+    const project = await projectService.getProjectById(
+      projectId,
+      userId,
+      req.user.role_id
+    );
 
-    if(!project){
+    if (!project) {
       return res.status(404).json({ message: "Project not found" });
     }
     res.json({
@@ -63,13 +71,18 @@ const addProjectMember = async (req, res) => {
   try {
     const { projectId } = req.params;
     const { user_id } = req.body;
-    const ownerId = req.user.id;
+    const actorId = req.user.id;
 
     if (!user_id) {
       return res.status(400).json({ message: "user_id is required" });
     }
 
-    await projectService.addProjectMember(projectId, user_id, ownerId);
+    await projectService.addProjectMember(
+      projectId,
+      user_id,
+      actorId,
+      req.user.role_id
+    );
 
     res.status(201).json({
       message: "Member added successfully",
@@ -78,7 +91,8 @@ const addProjectMember = async (req, res) => {
     if (
       err.message.includes("not found") ||
       err.message.includes("Unauthorized") ||
-      err.message.includes("already a member")
+      err.message.includes("already a member") ||
+      err.message.includes("Forbidden")
     ) {
       return res.status(400).json({ message: err.message });
     }
@@ -92,7 +106,11 @@ const getProjectMembers = async (req, res) => {
     const { projectId } = req.params;
     const userId = req.user.id;
 
-    const members = await projectService.getProjectMembers(projectId, userId);
+    const members = await projectService.getProjectMembers(
+      projectId,
+      userId,
+      req.user.role_id
+    );
 
     res.json({
       message: "Project members fetched successfully",
@@ -111,7 +129,7 @@ const updateMemberRole = async (req, res) => {
   try {
     const { projectId, memberId } = req.params;
     const { role } = req.body;
-    const ownerId = req.user.id;
+    const actorId = req.user.id;
 
     if (!role) {
       return res.status(400).json({ message: "role is required" });
@@ -121,7 +139,8 @@ const updateMemberRole = async (req, res) => {
       projectId,
       memberId,
       role,
-      ownerId
+      actorId,
+      req.user.role_id
     );
 
     res.json({
@@ -143,20 +162,19 @@ const updateMemberRole = async (req, res) => {
 const removeProjectMember = async (req, res) => {
   try {
     const { projectId, memberId } = req.params;
-    const ownerId = req.user.id;
+    const actorId = req.user.id;
 
     await projectService.removeProjectMember(
       projectId,
       memberId,
-      ownerId
+      actorId,
+      req.user.role_id
     );
 
     res.json({
       message: "Member removed successfully",
     });
-
   } catch (err) {
-
     if (
       err.message.includes("Unauthorized") ||
       err.message.includes("not found")
@@ -170,16 +188,17 @@ const removeProjectMember = async (req, res) => {
 
 const getProjectStats = async (req, res) => {
   try {
-
     const { projectId } = req.params;
     const userId = req.user.id;
 
-    const stats = await projectService.getProjectStats(projectId, userId);
+    const stats = await projectService.getProjectStats(
+      projectId,
+      userId,
+      req.user.role_id
+    );
 
     res.json(stats);
-
   } catch (err) {
-
     if (err.message.includes("Forbidden")) {
       return res.status(403).json({ message: err.message });
     }
@@ -190,16 +209,17 @@ const getProjectStats = async (req, res) => {
 
 const getProjectActivity = async (req, res) => {
   try {
-
     const { projectId } = req.params;
     const userId = req.user.id;
 
-    const activity = await projectService.getProjectActivity(projectId, userId);
+    const activity = await projectService.getProjectActivity(
+      projectId,
+      userId,
+      req.user.role_id
+    );
 
     res.json(activity);
-
   } catch (err) {
-
     if (err.message.includes("Forbidden")) {
       return res.status(403).json({ message: err.message });
     }
@@ -207,7 +227,6 @@ const getProjectActivity = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 module.exports = {
   createProject,
@@ -218,5 +237,5 @@ module.exports = {
   updateMemberRole,
   removeProjectMember,
   getProjectStats,
-  getProjectActivity
+  getProjectActivity,
 };

@@ -1,6 +1,13 @@
 const taskRepo = require("../repositories/task.repo");
-const projectRepo = require("../repositories/project.repo");
 const projectService = require("./project.service");
+const {
+  assertProjectAccess,
+  checkProjectPermission,
+} = require("../utils/projectAccess");
+
+const assertTaskProjectAccess = async (task, userId, roleId) => {
+  await assertProjectAccess(task.project_id, userId, roleId);
+};
 
 const createTask = async ({
   title,
@@ -10,12 +17,13 @@ const createTask = async ({
   due_date,
   projectId,
   userId,
+  roleId,
 }) => {
-
   await projectService.checkProjectPermission(
     projectId,
     userId,
-    ["ADMIN"]
+    ["ADMIN"],
+    roleId
   );
 
   return await taskRepo.createTask({
@@ -29,22 +37,15 @@ const createTask = async ({
   });
 };
 
-const getTasksByProject = async (projectId, userId) => {
-  // 1️⃣ verify project belongs to user
-  const project = await projectRepo.findByIdAndUser(projectId, userId);
-  
-  if (!project) {
-    throw new Error("Unauthorized or project not found");
-  }
+const getTasksByProject = async (projectId, userId, roleId) => {
+  await assertProjectAccess(projectId, userId, roleId);
 
-  // 2️⃣ fetch tasks
   return await taskRepo.getTasksByProject(projectId);
 };
 
 const ALLOWED_STATUS = ["todo", "in_progress", "completed", "blocked"];
 
-const updateTaskStatus = async (taskId, status, userId) => {
-
+const updateTaskStatus = async (taskId, status, userId, roleId) => {
   if (!ALLOWED_STATUS.includes(status)) {
     throw new Error("Invalid status value");
   }
@@ -55,33 +56,27 @@ const updateTaskStatus = async (taskId, status, userId) => {
     throw new Error("Task not found");
   }
 
-  // 🔐 RBAC CHECK
   try {
-    // OWNER or ADMIN → allowed
     await projectService.checkProjectPermission(
       task.project_id,
       userId,
-      ["ADMIN"]
+      ["ADMIN"],
+      roleId
     );
   } catch (err) {
-
-    // MEMBER → allowed only if task is assigned to them
     if (task.assigned_to !== userId) {
       throw new Error("Forbidden: insufficient permissions");
     }
-
   }
 
   const oldStatus = task.status;
 
-  // 🧠 idempotent behaviour (unchanged)
   if (oldStatus === status) {
     return task;
   }
 
   const updatedTask = await taskRepo.updateTaskStatus(taskId, status);
 
-  // 🧾 audit log (unchanged)
   await taskRepo.createTaskAuditLog({
     taskId,
     userId,
@@ -92,43 +87,28 @@ const updateTaskStatus = async (taskId, status, userId) => {
   return updatedTask;
 };
 
-const getTaskAuditLogs = async (taskId, userId) => {
+const getTaskAuditLogs = async (taskId, userId, roleId) => {
   const task = await taskRepo.getTaskById(taskId);
 
   if (!task) {
     throw new Error("Task not found");
   }
 
-  // verify ownership via project
-  const project = await projectRepo.findByIdAndUser(
-    task.project_id,
-    userId
-  );
-
-  if (!project) {
-    throw new Error("Unauthorized");
-  }
+  await assertTaskProjectAccess(task, userId, roleId);
 
   return await taskRepo.getTaskAuditLogs(taskId);
 };
 
 const userRepo = require("../repositories/user.repo");
 
-const assignTask = async (taskId, assignedTo, userId) => {
+const assignTask = async (taskId, assignedTo, userId, roleId) => {
   const task = await taskRepo.getTaskById(taskId);
 
   if (!task) {
     throw new Error("Task not found");
   }
 
-  const project = await projectRepo.findByIdAndUser(
-    task.project_id,
-    userId
-  );
-
-  if (!project) {
-    throw new Error("Unauthorized");
-  }
+  await assertTaskProjectAccess(task, userId, roleId);
 
   const user = await userRepo.findUserById(assignedTo);
 
@@ -142,10 +122,7 @@ const assignTask = async (taskId, assignedTo, userId) => {
     return task;
   }
 
-  const updatedTask = await taskRepo.updateTaskAssignee(
-    taskId,
-    assignedTo
-  );
+  const updatedTask = await taskRepo.updateTaskAssignee(taskId, assignedTo);
 
   await taskRepo.createTaskAssignmentLog({
     taskId,
@@ -157,21 +134,14 @@ const assignTask = async (taskId, assignedTo, userId) => {
   return updatedTask;
 };
 
-const getTaskAssignmentHistory = async (taskId, userId) => {
+const getTaskAssignmentHistory = async (taskId, userId, roleId) => {
   const task = await taskRepo.getTaskById(taskId);
 
   if (!task) {
     throw new Error("Task not found");
   }
 
-  const project = await projectRepo.findByIdAndUser(
-    task.project_id,
-    userId
-  );
-
-  if (!project) {
-    throw new Error("Unauthorized");
-  }
+  await assertTaskProjectAccess(task, userId, roleId);
 
   return await taskRepo.getTaskAssignmentHistory(taskId);
 };
@@ -180,33 +150,26 @@ const getMyTasks = async (userId, filters) => {
   return await taskRepo.getTasksAssignedToUser(userId, filters);
 };
 
-
-const updateTask = async (taskId, updates, userId) => {
-
+const updateTask = async (taskId, updates, userId, roleId) => {
   const task = await taskRepo.getTaskById(taskId);
 
   if (!task) {
     throw new Error("Task not found");
   }
 
-  // 🔐 RBAC CHECK
   try {
-    // OWNER or ADMIN can update any task
     await projectService.checkProjectPermission(
       task.project_id,
       userId,
-      ["ADMIN"]
+      ["ADMIN"],
+      roleId
     );
   } catch (err) {
-
-    // If not OWNER/ADMIN → allow only if task is assigned to the user
     if (task.assigned_to !== userId) {
       throw new Error("Forbidden: insufficient permissions");
     }
-
   }
 
-  // prevent status update from this endpoint
   if (updates.status) {
     delete updates.status;
   }
@@ -234,23 +197,26 @@ const updateTask = async (taskId, updates, userId) => {
   return await taskRepo.updateTask(taskId, filteredUpdates);
 };
 
-const deleteTask = async (taskId, userId) => {
+const deleteTask = async (taskId, userId, roleId) => {
   const task = await taskRepo.getTaskById(taskId);
 
   if (!task || task.is_deleted) {
     throw new Error("Task not found");
   }
 
-  const project = await projectRepo.findByIdAndUser(
-    task.project_id,
-    userId
-  );
-
-  if (!project) {
-    throw new Error("Unauthorized");
-  }
+  await assertTaskProjectAccess(task, userId, roleId);
 
   await taskRepo.softDeleteTask(taskId);
 };
 
-module.exports = { createTask , getTasksByProject, updateTaskStatus, getTaskAuditLogs, assignTask, getTaskAssignmentHistory, getMyTasks , updateTask , deleteTask};
+module.exports = {
+  createTask,
+  getTasksByProject,
+  updateTaskStatus,
+  getTaskAuditLogs,
+  assignTask,
+  getTaskAssignmentHistory,
+  getMyTasks,
+  updateTask,
+  deleteTask,
+};

@@ -1,8 +1,6 @@
 const taskService = require("../services/task.service");
 
-
 const createTask = async (req, res) => {
-  console.log("BODY:", req.body);
   try {
     const { title, description, priority, assigned_to, due_date } = req.body;
     const { projectId } = req.params;
@@ -22,6 +20,7 @@ const createTask = async (req, res) => {
       due_date,
       projectId,
       userId,
+      roleId: req.user.role_id,
     });
 
     res.status(201).json({
@@ -38,7 +37,11 @@ const getTasksByProject = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const tasks = await taskService.getTasksByProject(projectId, userId);
+    const tasks = await taskService.getTasksByProject(
+      projectId,
+      userId,
+      req.user.role_id
+    );
 
     res.json({
       message: "Tasks fetched successfully",
@@ -65,7 +68,8 @@ const updateTaskStatus = async (req, res) => {
     const updatedTask = await taskService.updateTaskStatus(
       taskId,
       status,
-      userId
+      userId,
+      req.user.role_id
     );
 
     res.json({
@@ -76,7 +80,8 @@ const updateTaskStatus = async (req, res) => {
     if (
       err.message.includes("not found") ||
       err.message.includes("Unauthorized") ||
-      err.message.includes("Invalid status")
+      err.message.includes("Invalid status") ||
+      err.message.includes("Forbidden")
     ) {
       return res.status(400).json({ message: err.message });
     }
@@ -85,19 +90,22 @@ const updateTaskStatus = async (req, res) => {
   }
 };
 
-const getTaskAuditLogs = async (req , res) => {
+const getTaskAuditLogs = async (req, res) => {
   try {
-    const {taskId} = req.params;
+    const { taskId } = req.params;
     const userId = req.user.id;
 
-    const logs = await taskService.getTaskAuditLogs(taskId , userId);
+    const logs = await taskService.getTaskAuditLogs(
+      taskId,
+      userId,
+      req.user.role_id
+    );
 
     res.json({
-      message : "Audit logs fetched successfully",
-      logs
+      message: "Audit logs fetched successfully",
+      logs,
     });
-  }
-  catch(err){
+  } catch (err) {
     if (
       err.message.includes("not found") ||
       err.message.includes("Unauthorized")
@@ -123,7 +131,8 @@ const assignTask = async (req, res) => {
     const task = await taskService.assignTask(
       taskId,
       assigned_to,
-      userId
+      userId,
+      req.user.role_id
     );
 
     res.json({
@@ -149,7 +158,8 @@ const getTaskAssignmentHistory = async (req, res) => {
 
     const history = await taskService.getTaskAssignmentHistory(
       taskId,
-      userId
+      userId,
+      req.user.role_id
     );
 
     res.json({
@@ -199,7 +209,8 @@ const updateTask = async (req, res) => {
     const updatedTask = await taskService.updateTask(
       taskId,
       req.body,
-      userId
+      userId,
+      req.user.role_id
     );
 
     res.json({
@@ -210,7 +221,8 @@ const updateTask = async (req, res) => {
     if (
       err.message.includes("not found") ||
       err.message.includes("Unauthorized") ||
-      err.message.includes("No valid fields")
+      err.message.includes("No valid fields") ||
+      err.message.includes("Forbidden")
     ) {
       return res.status(400).json({ message: err.message });
     }
@@ -224,7 +236,7 @@ const deleteTask = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.user.id;
 
-    await taskService.deleteTask(taskId, userId);
+    await taskService.deleteTask(taskId, userId, req.user.role_id);
 
     res.json({
       message: "Task deleted successfully",
@@ -241,5 +253,14 @@ const deleteTask = async (req, res) => {
   }
 };
 
-
-module.exports = { createTask, getTasksByProject, updateTaskStatus, getTaskAuditLogs, assignTask, getTaskAssignmentHistory, getMyTasks , updateTask, deleteTask};
+module.exports = {
+  createTask,
+  getTasksByProject,
+  updateTaskStatus,
+  getTaskAuditLogs,
+  assignTask,
+  getTaskAssignmentHistory,
+  getMyTasks,
+  updateTask,
+  deleteTask,
+};

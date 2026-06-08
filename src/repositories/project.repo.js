@@ -10,9 +10,19 @@ const createProject = async ({name , description , createdBy}) => {
     return result.rows[0];
 };
 
+const getAllProjects = async () => {
+  const result = await pool.query(
+    `SELECT id, name, description, created_at, created_by
+     FROM projects
+     ORDER BY created_at DESC`
+  );
+
+  return result.rows;
+};
+
 const getProjectsByUser = async (userId) => {
   const result = await pool.query(
-    `SELECT id, name, description, created_at
+    `SELECT id, name, description, created_at, created_by
      FROM projects
      WHERE created_by = $1
      ORDER BY created_at DESC`,
@@ -22,9 +32,20 @@ const getProjectsByUser = async (userId) => {
   return result.rows;
 };
 
+const findById = async (projectId) => {
+  const result = await pool.query(
+    `SELECT id, name, description, created_at, created_by
+     FROM projects
+     WHERE id = $1`,
+    [projectId]
+  );
+
+  return result.rows[0];
+};
+
 const getProjectById = async (projectId, userId) => {
   const result = await pool.query(
-    `SELECT id, name, description, created_at
+    `SELECT id, name, description, created_at, created_by
      FROM projects
      WHERE id = $1 AND created_by = $2`,
     [projectId, userId]
@@ -193,7 +214,9 @@ const getProjectActivity = async (projectId) => {
 
 module.exports = {
   createProject,
+  getAllProjects,
   getProjectsByUser,
+  findById,
   getProjectById,
   findByIdAndUser,
   addProjectMember,

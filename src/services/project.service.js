@@ -1,30 +1,34 @@
-const projectRepo = require('../repositories/project.repo');
+const projectRepo = require("../repositories/project.repo");
 const userRepo = require("../repositories/user.repo");
+const { isSystemAdmin } = require("../constants/roleConstants");
+const {
+  getProjectForUser,
+  assertProjectAccess,
+  checkProjectPermission,
+} = require("../utils/projectAccess");
 
-
-
-const createProject = async ({ name , description , userId}) => {
-  return await projectRepo.createProject({ name , description , createdBy: userId,});
+const createProject = async ({ name, description, userId }) => {
+  return await projectRepo.createProject({
+    name,
+    description,
+    createdBy: userId,
+  });
 };
 
-const getProjects = async (userId) => {
+const getProjects = async (userId, roleId) => {
+  if (isSystemAdmin(roleId)) {
+    return await projectRepo.getAllProjects();
+  }
+
   return await projectRepo.getProjectsByUser(userId);
 };
 
-const getProjectById = async (projectId , userId) => {
-  return await projectRepo.getProjectById(projectId , userId);
+const getProjectById = async (projectId, userId, roleId) => {
+  return await getProjectForUser(projectId, userId, roleId);
 };
 
-const addProjectMember = async (projectId, userIdToAdd, ownerId) => {
-  const project = await projectService.checkProjectPermission(
-  projectId,
-  ownerId,
-  ["ADMIN"]
-);
-
-  if (!project) {
-    throw new Error("Unauthorized or project not found");
-  }
+const addProjectMember = async (projectId, userIdToAdd, actorId, roleId) => {
+  await checkProjectPermission(projectId, actorId, ["ADMIN"], roleId);
 
   const user = await userRepo.findUserById(userIdToAdd);
 
@@ -44,27 +48,14 @@ const addProjectMember = async (projectId, userIdToAdd, ownerId) => {
   await projectRepo.addProjectMember(projectId, userIdToAdd);
 };
 
-const getProjectMembers = async (projectId, ownerId) => {
-  const project = await projectRepo.findByIdAndUser(projectId, ownerId);
-
-  if (!project) {
-    throw new Error("Unauthorized or project not found");
-  }
+const getProjectMembers = async (projectId, userId, roleId) => {
+  await assertProjectAccess(projectId, userId, roleId);
 
   return await projectRepo.getProjectMembers(projectId);
 };
 
-const updateMemberRole = async (
-  projectId,
-  memberId,
-  role,
-  ownerId
-) => {
-  const project = await projectRepo.findByIdAndUser(projectId, ownerId);
-
-  if (!project) {
-    throw new Error("Unauthorized or project not found");
-  }
+const updateMemberRole = async (projectId, memberId, role, actorId, roleId) => {
+  await assertProjectAccess(projectId, actorId, roleId);
 
   const allowedRoles = ["ADMIN", "MEMBER"];
 
@@ -81,34 +72,8 @@ const updateMemberRole = async (
   await projectRepo.updateMemberRole(projectId, memberId, role);
 };
 
-const checkProjectPermission = async (
-  projectId,
-  userId,
-  allowedRoles = []
-) => {
-  // OWNER check
-  const project = await projectRepo.findByIdAndUser(projectId, userId);
-
-  if (project) return;
-
-  // MEMBER role check
-  const member = await projectRepo.getProjectMemberRole(
-    projectId,
-    userId
-  );
-
-  if (!member || !allowedRoles.includes(member.role)) {
-    throw new Error("Forbidden: insufficient permissions");
-  }
-};
-
-const removeProjectMember = async (projectId, memberId, ownerId) => {
-
-  const project = await projectRepo.findByIdAndUser(projectId, ownerId);
-
-  if (!project) {
-    throw new Error("Unauthorized or project not found");
-  }
+const removeProjectMember = async (projectId, memberId, actorId, roleId) => {
+  await assertProjectAccess(projectId, actorId, roleId);
 
   const member = await projectRepo.getProjectMember(projectId, memberId);
 
@@ -119,20 +84,17 @@ const removeProjectMember = async (projectId, memberId, ownerId) => {
   await projectRepo.removeProjectMember(projectId, memberId);
 };
 
-const getProjectStats = async (projectId, userId) => {
-
-  await checkProjectPermission(projectId, userId, ["ADMIN", "MEMBER"]);
+const getProjectStats = async (projectId, userId, roleId) => {
+  await checkProjectPermission(projectId, userId, ["ADMIN", "MEMBER"], roleId);
 
   return await projectRepo.getProjectStats(projectId);
 };
 
-const getProjectActivity = async (projectId, userId) => {
-
-  await checkProjectPermission(projectId, userId, ["ADMIN", "MEMBER"]);
+const getProjectActivity = async (projectId, userId, roleId) => {
+  await checkProjectPermission(projectId, userId, ["ADMIN", "MEMBER"], roleId);
 
   return await projectRepo.getProjectActivity(projectId);
 };
-
 
 module.exports = {
   createProject,
@@ -144,5 +106,5 @@ module.exports = {
   checkProjectPermission,
   removeProjectMember,
   getProjectStats,
-  getProjectActivity
+  getProjectActivity,
 };
